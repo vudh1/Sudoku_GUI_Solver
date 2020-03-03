@@ -19,11 +19,12 @@ class Grid:
         [0,0,0,0,0,0,0,0,0]
     ]
 
-    def __init__(self, rows, cols, width, height):
-        
-        generate_sudoku(board)
+    def __init__(self, rows, cols, width, height,level):
+        self.level = level
         self.rows = rows
         self.cols = cols
+
+        generate_sudoku(board,level)
         self.cubes = [[Cube(self.board[i][j], i, j, width, height) for j in range(cols)] for i in range(rows)]
         self.width = width
         self.height = height
@@ -156,7 +157,7 @@ def format_time(secs):
 def main():
     window = pygame.display.set_mode((540,600))
     pygame.display.set_caption("Sudoku_Puzzle")
-    board = Grid(9, 9, 540, 540)
+    board = Grid(9, 9, 540, 540,20)
     key = None
     run = True
     start = time.time()
