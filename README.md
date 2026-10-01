@@ -2,6 +2,12 @@
 
 A playable Sudoku desktop app backed by a backtracking solver and a puzzle generator that preserves a **unique solution** while removing clues.
 
+## Demo
+
+![Sudoku Solver animated demo](demo.gif)
+
+*Animated backtracking solve using the same row, column, and 3×3 validation rules as the application.*
+
 ## Features
 
 - backtracking Sudoku solver;
