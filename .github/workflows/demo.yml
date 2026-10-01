@@ -1,0 +1,33 @@
+name: Generate demo GIF
+
+on:
+  push:
+    paths:
+      - scripts/generate_demo.py
+      - .github/workflows/demo.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pillow
+      - run: python scripts/generate_demo.py
+      - name: Commit refreshed demo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add demo.gif
+          if git diff --cached --quiet; then
+            echo "Demo already current"
+            exit 0
+          fi
+          git commit -m "docs: refresh animated Sudoku demo"
+          git push
