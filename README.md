@@ -6,7 +6,7 @@ A playable Sudoku desktop app backed by a backtracking solver and a puzzle gener
 
 ![Sudoku Solver animated demo](demo.gif)
 
-*Animated backtracking solve using the same row, column, and 3×3 validation rules as the application.*
+*Captured from the actual Pygame window while `GUI.main()` runs: select a cell, reject a wrong answer, pencil and clear a value, then complete the puzzle with keyboard input. The remaining correct entries are automated; this is not an automatic-solve feature in the UI.*
 
 ## Features
 
@@ -56,3 +56,12 @@ python -m unittest -v
 ```
 
 The tests verify solving, move validation, rejection of invalid boards, and unique-solution puzzle generation.
+
+## Re-record the demo
+
+```bash
+pip install -r requirements.txt pillow
+python scripts/generate_demo.py
+```
+
+The recorder runs the real GUI event loop with a reproducible generated puzzle, feeds mouse/key events, and captures the Pygame display surface. SDL's offscreen driver allows recording without a desktop. No board renderer or solver is duplicated. **Actions → Generate demo GIF** can refresh it manually.

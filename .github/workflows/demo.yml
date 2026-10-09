@@ -1,10 +1,6 @@
 name: Generate demo GIF
 
 on:
-  push:
-    paths:
-      - scripts/generate_demo.py
-      - .github/workflows/demo.yml
   workflow_dispatch:
 
 permissions:
@@ -18,7 +14,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install pillow
+      - run: pip install -r requirements.txt pillow
       - run: python scripts/generate_demo.py
       - name: Commit refreshed demo
         run: |
