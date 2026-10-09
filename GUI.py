@@ -171,6 +171,7 @@ def main():
     running = True
     start = time.time()
     strikes = 0
+    clock = pygame.time.Clock()
 
     while running:
         elapsed = round(time.time() - start)
@@ -198,7 +199,7 @@ def main():
                             running = False
 
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                clicked = board.click(pygame.mouse.get_pos())
+                clicked = board.click(event.pos)
                 if clicked is not None:
                     board.select(*clicked)
                     key = None
@@ -208,6 +209,7 @@ def main():
 
         redraw_window(window, board, elapsed, strikes)
         pygame.display.update()
+        clock.tick(60)
 
     pygame.quit()
 

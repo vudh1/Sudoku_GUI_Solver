@@ -1,90 +1,102 @@
-from PIL import Image, ImageDraw, ImageFont
-import copy
+"""Run GUI.main and capture its actual Pygame display after scripted input."""
+import os
+import sys
+from pathlib import Path
+from unittest.mock import patch
 
-W,H=900,520
-BG=(13,17,23); PANEL=(22,27,34); TEXT=(230,237,243); MUTED=(139,148,158)
-BLUE=(88,166,255); GREEN=(46,160,67); ACCENT=(255,200,80)
+os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 
-def font(size,bold=False,mono=False):
-    base="/usr/share/fonts/truetype/dejavu/"
-    if mono:
-        name="DejaVuSansMono-Bold.ttf" if bold else "DejaVuSansMono.ttf"
-    else:
-        name="DejaVuSans-Bold.ttf" if bold else "DejaVuSans.ttf"
-    return ImageFont.truetype(base+name,size)
+import pygame
+from PIL import Image
+import GUI
+from Sudoku_Solver import board_is_valid, generate_puzzle
 
-def solve(board):
-    for r in range(9):
-        for c in range(9):
-            if board[r][c]==0:
-                used=set(board[r])|{board[i][c] for i in range(9)}|{board[i][j] for i in range(r//3*3,r//3*3+3) for j in range(c//3*3,c//3*3+3)}
-                for n in range(1,10):
-                    if n not in used:
-                        board[r][c]=n
-                        if solve(board): return True
-                        board[r][c]=0
-                return False
-    return True
 
-puzzle=[
-[5,3,0,0,7,0,0,0,0],
-[6,0,0,1,9,5,0,0,0],
-[0,9,8,0,0,0,0,6,0],
-[8,0,0,0,6,0,0,0,3],
-[4,0,0,8,0,3,0,0,1],
-[7,0,0,0,2,0,0,0,6],
-[0,6,0,0,0,0,2,8,0],
-[0,0,0,4,1,9,0,0,5],
-[0,0,0,0,8,0,0,7,9],
-]
-solution=copy.deepcopy(puzzle); solve(solution)
-empties=[(r,c) for r in range(9) for c in range(9) if puzzle[r][c]==0]
-frames=[]
+def main():
+    original_grid = GUI.Grid
+    original_update = pygame.display.update
+    original_events = pygame.event.get
+    frames = []
+    state = {"frame": 0}
+    events = {}
 
-for i in range(62):
-    im=Image.new("RGB",(W,H),BG); d=ImageDraw.Draw(im)
-    d.text((34,22),"Sudoku GUI Solver",font=font(28,True),fill=TEXT)
-    d.text((34,58),"Backtracking solver + unique-solution puzzle generation",font=font(16),fill=MUTED)
-    d.rounded_rectangle((34,94,520,488),radius=18,fill=PANEL)
-    gx,gy=64,112; gs=360; cs=gs/9
-    d.rectangle((gx,gy,gx+gs,gy+gs),fill=(250,250,250))
+    def key(value):
+        return pygame.event.Event(pygame.KEYDOWN, key=value)
 
-    reveal=0 if i<7 else (len(empties) if i>54 else min(len(empties),int((i-7)/47*len(empties))))
-    board=copy.deepcopy(puzzle)
-    for r,c in empties[:reveal]: board[r][c]=solution[r][c]
-    current=empties[reveal] if reveal<len(empties) and 7<=i<=54 else None
-    if current:
-        r,c=current
-        d.rectangle((gx+c*cs,gy+r*cs,gx+(c+1)*cs,gy+(r+1)*cs),fill=(225,239,255))
+    def click(row, col):
+        return pygame.event.Event(pygame.MOUSEBUTTONDOWN,
+                                  pos=(col * 60 + 30, row * 60 + 30), button=1)
 
-    for g in range(10):
-        width=4 if g%3==0 else 1
-        col=(35,35,35) if g%3==0 else (160,160,160)
-        d.line((gx+g*cs,gy,gx+g*cs,gy+gs),fill=col,width=width)
-        d.line((gx,gy+g*cs,gx+gs,gy+g*cs),fill=col,width=width)
+    def create_grid(*args, **kwargs):
+        board = original_grid(*args, **kwargs)
+        state["board"] = board
+        empty = [(r, c) for r in range(9) for c in range(9) if not board.board[r][c]]
+        row, col = empty[0]
+        value = board.solution[row][col]
+        wrong = value % 9 + 1
+        events.update({30: click(row, col), 60: key(pygame.K_0 + wrong),
+                       90: key(pygame.K_RETURN), 120: key(pygame.K_0 + value),
+                       150: key(pygame.K_RETURN)})
+        row, col = empty[1]
+        value = board.solution[row][col]
+        events.update({180: click(row, col), 195: key(pygame.K_0 + value),
+                       210: key(pygame.K_BACKSPACE), 240: key(pygame.K_0 + value),
+                       255: key(pygame.K_RETURN)})
+        for index, (row, col) in enumerate(empty[2:]):
+            frame = 285 + index * 9
+            events[frame] = click(row, col)
+            events[frame + 3] = key(pygame.K_0 + board.solution[row][col])
+            events[frame + 6] = key(pygame.K_RETURN)
+        state["empty"] = empty
+        return board
 
-    for r in range(9):
-        for c in range(9):
-            v=board[r][c]
-            if not v: continue
-            given=puzzle[r][c]!=0
-            f=font(24,given); color=(30,30,30) if given else (30,104,205)
-            box=d.textbbox((0,0),str(v),font=f)
-            d.text((gx+c*cs+(cs-(box[2]-box[0]))/2,gy+r*cs+(cs-(box[3]-box[1]))/2-2),str(v),font=f,fill=color)
+    def get_events():
+        result = original_events()
+        event = events.get(state["frame"])
+        if event is not None:
+            result.append(event)
+        if state["frame"] > 900:
+            raise AssertionError("GUI did not finish after scripted input")
+        return result
 
-    d.text((555,114),"SOLVER STATUS",font=font(14,True),fill=GREEN)
-    status="Puzzle loaded" if reveal==0 else ("Solved" if reveal==len(empties) else "Backtracking…")
-    d.text((555,148),status,font=font(27,True),fill=TEXT)
-    d.text((555,193),f"Filled   {reveal:02d}/{len(empties)}",font=font(18,False,True),fill=BLUE)
-    d.text((555,225),"Validation",font=font(17,True),fill=TEXT)
-    d.text((555,253),"✓ row constraints",font=font(15),fill=MUTED)
-    d.text((555,279),"✓ column constraints",font=font(15),fill=MUTED)
-    d.text((555,305),"✓ 3×3 box constraints",font=font(15),fill=MUTED)
-    d.text((555,345),"Generator",font=font(17,True),fill=TEXT)
-    d.text((555,373),"Keeps a removal only",font=font(15),fill=MUTED)
-    d.text((555,397),"when solution count = 1",font=font(15),fill=MUTED)
-    d.rounded_rectangle((548,438,850,475),radius=12,fill=(31,38,47))
-    d.text((568,447),"Unique puzzle ready" if reveal==len(empties) else "Testing candidates",font=font(15),fill=ACCENT)
-    frames.append(im)
+    def capture():
+        original_update()
+        frame = state["frame"]
+        board = state["board"]
+        first = board.cubes[state["empty"][0][0]][state["empty"][0][1]]
+        if frame == 91:
+            assert first.value == 0 and first.temp == 0, "Wrong entry was not rejected"
+        if frame == 151:
+            assert first.value == board.solution[first.row][first.col]
+        if frame == 211:
+            row, col = state["empty"][1]
+            assert board.cubes[row][col].temp == 0, "Backspace did not clear the sketch"
+        if frame % 3 == 0:
+            surface = pygame.display.get_surface()
+            frames.append(Image.frombytes("RGB", surface.get_size(), pygame.image.tobytes(surface, "RGB")))
+        state["frame"] += 1
 
-frames[0].save("demo.gif",save_all=True,append_images=frames[1:],duration=110,loop=0,optimize=True,disposal=2)
+    # Only seed input generation and drive input/capture. All validation, event
+    # handling, gameplay and rendering execute inside the actual application.
+    with patch.object(GUI, "generate_puzzle", lambda level: generate_puzzle(level, seed=42)), \
+         patch.object(GUI, "Grid", create_grid), \
+         patch.object(pygame.event, "get", get_events), \
+         patch.object(pygame.display, "update", capture):
+        GUI.main()
+
+    board = state["board"]
+    assert board.is_finished() and board.model == board.solution
+    assert board_is_valid(board.model)
+    durations = [50] * len(frames)
+    durations[-1] = 2000
+    frames[0].save(ROOT / "demo.gif", save_all=True, append_images=frames[1:],
+                   duration=durations, loop=0, optimize=True)
+    print(f"Captured {len(frames)} real GUI frames; rejected a wrong entry, cleared a sketch, "
+          "committed correct entries and completed a valid board through GUI.main.")
+
+
+if __name__ == "__main__":
+    main()
